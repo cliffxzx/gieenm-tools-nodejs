@@ -1,0 +1,28 @@
+{
+  "env": {
+    "es2020": true
+  },
+  "extends": [
+    "airbnb"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": 11,
+    "sourceType": "module"
+  },
+  "plugins": [
+    "@typescript-eslint"
+  ],
+  "rules": {
+    "import/extensions": [
+      "warn",
+      "never"
+    ],
+    "import/prefer-default-export": [
+      "off"
+    ],
+    "no-underscore-dangle": [
+      "off"
+    ]
+  }
+}
