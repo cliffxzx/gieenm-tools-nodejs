@@ -5,13 +5,15 @@ const router = new Router();
 
 router.prefix('/firewall');
 
-router.get('/address', controller.getAllAddress);
-router.post('/address', controller.addAddress);
-router.delete('/address', controller.delAddress);
+router.get('/address/:flr', controller.floorAuth, controller.getAllAddress);
+router.post('/address/:flr', controller.floorAuth, controller.addAddress);
+router.delete('/address/:flr', controller.floorAuth, controller.delAddress);
 
-router.get('/addressGroup', controller.getAllAddressGroup);
-router.get('/addressGroup/detail', controller.getAllAddressGroupDetail);
-router.get('/addressGroup/:id', controller.getAddressGroup);
-router.put('/addressGroup/:id', controller.updateAddressGroup);
+router.get('/addressGroup/:flr', controller.floorAuth, controller.getAllAddressGroup);
+router.get('/addressGroup/:flr/:id', controller.floorAuth, controller.getAddressGroup);
+router.put('/addressGroup/:flr/:id', controller.floorAuth, controller.updateAddressGroup);
+
+router.get('/anFlow/:flr', controller.floorAuth, controller.getAllAnFlow);
+router.del('/anFlow/:flr', controller.floorAuth, controller.delAllAnFlow);
 
 export default router;

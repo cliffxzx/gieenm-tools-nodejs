@@ -1,7 +1,12 @@
 import axios from 'axios';
 import cheerio from 'cheerio';
+import moment, { locale } from 'moment';
+import 'moment-timezone';
 
+import { URLSearchParams } from 'url';
 import configs from '../configs';
+
+const pageCount = Number.parseInt(configs.firewall.pageCount!, 10) || 10;
 
 export enum floor {
   '1f' = 'http://140.115.151.224:8080/cgi-bin',
@@ -17,63 +22,91 @@ export interface FloorAuth {
   auth: string,
 }
 
-export interface Address {
-  id?: ID,
-  name?: string,
-  ip?: string,
-  subnet?: string,
-  mac?: string,
-}
-
 export interface ID {
-  n?: string,
+  n: string,
   time: string,
 }
 
-export interface AddressGroup {
-  id?: ID,
-  name?: string,
-  addresses?: Address[],
+export interface Address {
+  id: ID,
+  name: string,
+  ip: string,
+  subnet: string,
+  mac: string,
 }
 
-export const getAllAddress = async ({ auth, flr }: FloorAuth) => {
+export interface SmallAddress {
+  id: { time: string },
+  name: string
+}
+
+export interface AddressGroup {
+  id: ID,
+  name: string,
+  inGroup: SmallAddress[],
+  outGroup?: SmallAddress[]
+}
+
+export interface AnFlow {
+  ip: string,
+  name: string,
+  mac: string,
+  date: Date,
+}
+
+export const getAllAddress = async (fa: FloorAuth): Promise<Address[]> => {
   try {
     let
       pageNow = 0,
       pageTotal = 0;
 
     const
-      { pageCount } = configs.firewall,
       IPs: Address[] = [],
-      getAddress = async (se: number) => {
-        const $ = cheerio.load((await axios.get(`${floor[flr]}/address.cgi`, {
-          params: {
-            menu: 'click_v=23\nclick_v=24\nclick_v=25\n',
-            MULTI_LANG: 'ch',
-            se,
-          },
-          headers: {
-            Authorization: auth,
-          },
-        })).data);
+      processHtml = async (se: number) => {
+        const
+          _IPs: Address[] = [],
+          $ = cheerio.load((await axios.get(`${floor[fa.flr]}/address.cgi`, {
+            params: {
+              menu: 'click_v=23\nclick_v=24\nclick_v=25\n',
+              MULTI_LANG: 'ch',
+              se,
+            },
+            headers: {
+              Authorization: fa.auth,
+            },
+          })).data);
 
         if (!pageNow && !pageTotal) {
           pageNow = +$('input[name="cp1"]').val();
           pageTotal = +$('tr.list_tool_text_attr > td').first().text().split('/')[1];
         }
 
-        $('body > center > form > table.FixedTable tr.Col').each((idx, row) => IPs.push({
-          name: row?.children[1]?.children[0]?.data as string,
-          ip: row?.children[7]?.children[0]?.data?.split('/')?.[0]?.replace(' ', ''),
-          subnet: row?.children[7]?.children[0]?.data?.split('/')?.[1]?.replace(' ', ''),
-          mac: row?.children[9]?.children[0]?.data,
-        }));
+        $('body > center > form > table.FixedTable tr.Col').each((idx, row) => {
+          const
+            col = $(row).find('td'),
+            ip = col.eq(3).text()
+              .replace(' ', '')
+              .split('/'),
+            id = col.eq(5).find('button').attr('onclick')!
+              .replace(/[)\s';]/gi, '')
+              .split(/[(,]/);
+
+          _IPs.push({
+            id: { n: id[3], time: id[2] },
+            name: col.eq(0).text(),
+            ip: ip[0],
+            subnet: ip[1],
+            mac: col.eq(4).text(),
+          });
+        });
+
+        return _IPs;
       };
 
-    await getAddress(1);
+    IPs.push(...await processHtml(1));
 
     const pages = Array.from(Array(pageTotal - pageNow), (_, i) => i + 1);
-    await Promise.all(pages.map((i) => getAddress(i * pageCount + 1)));
+    IPs.push(...(await Promise.all(pages.map((i) => processHtml(i * pageCount + 1)))).flat(2));
 
     return IPs;
   } catch (e) {
@@ -83,142 +116,124 @@ export const getAllAddress = async ({ auth, flr }: FloorAuth) => {
   return [];
 };
 
-export const addAddress = async ({ auth, flr }: FloorAuth, address: Address) => {
+export const addAddress = async (fa: FloorAuth, address: Address): Promise<Address | null> => {
   try {
-    await axios.post(`${floor[flr]}/address.cgi`, null, {
-      params: {
-        q: '1',
-        s: '1',
-        MULTI_LANG: 'ch',
-        menu: 'click_v=23\nclick_v=24\nclick_v=25\n',
-        ipv: '0',
-        adstartip4: '0.0.0.0',
-        interface: 'All',
-        n: (await getAllAddress({ auth, flr }))?.length,
-        id: (new Date().toISOString()).split(/[-T:.]/).slice(0, 6)
-          .join(''),
-        name: address.name,
-        ip: address.ip,
-        ip4: address.ip,
-        nm4: address.subnet,
-        mask: address.subnet,
-        mac: address.mac,
-        admac: address.mac,
-      },
-      headers: {
-        Authorization: auth,
-      },
+    const
+      $ = cheerio.load((await axios.post(`${floor[fa.flr]}/address.cgi`, null, {
+        params: {
+          q: '1',
+          s: '1',
+          MULTI_LANG: 'ch',
+          menu: 'click_v=23\nclick_v=24\nclick_v=25\n',
+          ipv: '0',
+          adstartip4: '0.0.0.0',
+          interface: 'All',
+          n: (await getAllAddress(fa)).length,
+          id: (new Date().toISOString()).split(/[-T:.]/).slice(0, 6)
+            .join(''),
+          name: address.name,
+          ip: address.ip,
+          ip4: address.ip,
+          nm4: address.subnet,
+          mask: address.subnet,
+          mac: address.mac,
+          admac: address.mac,
+        },
+        headers: {
+          Authorization: fa.auth,
+        },
+      })).data);
+
+    let res: Address | null = null;
+
+    $('body > center > form > table.FixedTable tr.Col').each((idx, row) => {
+      const
+        col = $(row).find('td'),
+        name = col.eq(0).text();
+
+      if (name === address.name) {
+        const
+          ip = col.eq(3).text()
+            .replace(' ', '')
+            .split('/'),
+          id = col.eq(5).find('button').attr('onclick')!
+            .replace(/[)\s';]/gi, '')
+            .split(/[(,]/);
+
+        res = {
+          id: { n: id[3], time: id[2] },
+          name,
+          ip: ip[0],
+          subnet: ip[1],
+          mac: col.eq(4).text(),
+        };
+      }
     });
 
-    return { success: true };
+    return res;
   } catch (e) {
-    console.log(e);
-    return { success: false };
+    console.error(e);
   }
+
+  return null;
 };
 
-export const delAddress = async ({ auth, flr }: FloorAuth, { n, time }: ID) => {
+export const delAddress = async (fa: FloorAuth, { n, time }: ID): Promise<boolean> => {
   try {
-    await axios.post(`${floor[flr]}/address.cgi`, null, {
+    await axios.post(`${floor[fa.flr]}/address.cgi`, null, {
       params: {
         q: '3',
         s: '3',
         MULTI_LANG: 'ch',
         menu: 'click_v=23\nclick_v=24\nclick_v=25\n',
-        time,
+        id: time,
         n,
       },
       headers: {
-        Authorization: auth,
+        Authorization: fa.auth,
       },
     });
 
-    return { success: true };
+    return true;
   } catch (e) {
     console.log(e);
-    return { success: false };
+    return false;
   }
 };
 
-export const getAllAddressGroup = async ({ auth, flr }: FloorAuth) => {
-  try {
-    let
-      pageNow = 0,
-      pageTotal = 0;
-
-    const
-      { pageCount } = configs.firewall,
-      groups: AddressGroup[] = [],
-      getAddressGroup = async (se: number) => {
-        const $ = cheerio.load((await axios.get(`${floor[flr]}/address.cgi`, {
-          params: {
-            t: 1,
-            menu: 'click_v=23\nclick_v=24\nclick_v=26\n',
-            MULTI_LANG: 'ch',
-            se,
-          },
-          headers: {
-            Authorization: auth,
-          },
-        })).data);
-
-        if (!pageNow && !pageTotal) {
-          pageNow = +$('input[name="cp1"]').val();
-          pageTotal = +$('tr.list_tool_text_attr > td').first().text().split('/')[1];
-        }
-
-        $('body > center > form > table.FixedTable tr.Col').each((idx, row) => {
-          const aid = cheerio.load(row)('button[type=submit]')
-            ?.attr('onclick')
-            ?.replace(/[)\s';]/gi, '')
-            .split(/[(,]/) as string[];
-
-          groups.push({
-            id: { time: aid[2], n: aid[3] },
-            name: row?.children[1]?.children[0]?.data as string,
-            addresses: row?.children[3]?.children[0]?.data?.split(', ').map((name) => ({ name })),
-          });
-        });
-      };
-
-    await getAddressGroup(1);
-
-    const pages = Array.from(Array(pageTotal - pageNow), (_, i) => i + 1);
-    await Promise.all(pages.map((i) => getAddressGroup(i * pageCount + 1)));
-
-    return groups;
-  } catch (e) {
-    console.log(e);
-    return null;
-  }
-};
-
-export const getAddressGroup = async ({ auth, flr }: FloorAuth, { id }: AddressGroup) => {
+export const getAddressGroup = async (fa: FloorAuth, id: ID): Promise<AddressGroup | null> => {
   try {
     const
-      $ = cheerio.load((await axios.post(`${floor[flr]}/address.cgi`, null, {
+      $ = cheerio.load((await axios.post(`${floor[fa.flr]}/address.cgi`, null, {
         params: {
           q: '2',
           t: '1',
           menu: 'click_v=23\nclick_v=24\nclick_v=26',
           MULTI_LANG: 'ch',
-          n: id?.n,
-          id: id?.time,
+          n: id.n,
+          id: id.time,
         },
         headers: {
-          Authorization: auth,
+          Authorization: fa.auth,
         },
       })).data);
 
     const
       table = $('body > center > form > table.MainTable > tbody > tr.Col > td > table'),
-      addresses: Address[] = [];
+      inGroup: SmallAddress[] = [],
+      outGroup: SmallAddress[] = [];
 
-    table.find('select#avail_members > option').each((idx, row) => addresses.push({
+    table.find('select#avail_members > option').each((idx, row) => outGroup.push({
       id: { time: row.attribs.value },
-      name: row.children[0].data,
+      name: $(row).text(),
     }));
-    addresses.splice(0, 1);
+    outGroup.splice(0, 1);
+
+    table.find('select#select_members > option').each((idx, row) => inGroup.push({
+      id: { time: row.attribs.value },
+      name: $(row).text(),
+    }));
+    inGroup.splice(0, 1);
 
     const group: AddressGroup = {
       id: {
@@ -226,24 +241,171 @@ export const getAddressGroup = async ({ auth, flr }: FloorAuth, { id }: AddressG
         time: $('input[name="id"]').val(),
       },
       name: table.find('input[name="name"]').val(),
-      addresses,
+      outGroup,
+      inGroup,
     };
 
     return group;
   } catch (e) {
     console.log(e);
-    return null;
   }
+  return null;
 };
 
-export const getAllAddressGroupDetail = async ({ auth, flr }: FloorAuth) => {
-  const groups = await getAllAddressGroup({ auth, flr });
-  await Promise.all(
-    groups?.map(async (group) => {
-      const detail = await getAddressGroup({ auth, flr }, { id: group.id });
-      group.addresses = detail?.addresses;
-    }) || [],
-  );
+export const getAllAddressGroup = async (fa: FloorAuth): Promise<AddressGroup[] | null> => {
+  try {
+    let
+      pageNow = 0,
+      pageTotal = 0;
 
-  return groups;
+    const
+      groups: AddressGroup[] = [],
+      processHtml = async (se: number) => {
+        const
+          _groups: AddressGroup[] = [],
+          $ = cheerio.load((await axios.get(`${floor[fa.flr]}/address.cgi`, {
+            params: {
+              t: 1,
+              menu: 'click_v=23\nclick_v=24\nclick_v=26\n',
+              MULTI_LANG: 'ch',
+              se,
+            },
+            headers: {
+              Authorization: fa.auth,
+            },
+          })).data);
+
+        if (!pageNow && !pageTotal) {
+          pageNow = +$('input[name="cp1"]').val();
+          pageTotal = +$('tr.list_tool_text_attr > td').first().text().split('/')[1];
+        }
+
+        await Promise.all(Array.from($('body > center > form > table.FixedTable tr.Col'))
+          .map(async (row) => {
+            const col = $(row);
+            const sid = col.find('button[type=submit]').attr('onclick')?.replace(/[)\s';]/gi, '')?.split(/[(,]/) as string[];
+            const id: ID = { n: sid[3], time: sid[2] };
+
+            const group = await getAddressGroup(fa, id);
+
+            _groups.push(group!);
+          }));
+
+        return _groups;
+      };
+
+    groups.push(...await processHtml(1));
+
+    const pages = Array.from(Array(pageTotal - pageNow), (_, i) => i + 1);
+    groups.push(...(await Promise.all(pages.map((i) => processHtml(i * pageCount + 1)))).flat(2));
+
+    return groups;
+  } catch (e) {
+    console.log(e);
+  }
+
+  return null;
+};
+
+export const updateAddressGroup = async (fa: FloorAuth, addressGroup: AddressGroup)
+  : Promise<AddressGroup | null> => {
+  try {
+    await axios.post(`${floor[fa.flr]}/address.cgi`, null, {
+      params: new URLSearchParams([
+        ['q', '2'],
+        ['t', '1'],
+        ['s', '2'],
+        ['MULTI_LANG', 'ch'],
+        ['menu', 'click_v=23\nclick_v=24\nclick_v=26'],
+        ['n', addressGroup.id.n],
+        ['id', addressGroup.id.time],
+        ['name', addressGroup.name],
+        ...addressGroup.inGroup.map((address) => ['select_members', address.id.time] as [string, string]),
+      ]),
+      headers: {
+        Authorization: fa.auth,
+      },
+    });
+
+    return await getAddressGroup(fa, addressGroup.id);
+  } catch (e) {
+    console.log(e);
+  }
+
+  return null;
+};
+
+export const getAllAnFlow = async (fa: FloorAuth): Promise<AnFlow[] | null> => {
+  try {
+    let
+      pageNow = 0,
+      pageTotal = 0;
+
+    const
+      anFlows: AnFlow[] = [],
+      processHtml = async (se: number) => {
+        const
+          _anFlows: AnFlow[] = [],
+          $ = cheerio.load((await axios.get(`${floor[fa.flr]}/anflowlist.cgi`, {
+            params: {
+              menu: 'click_v=125\nclick_v=127',
+              MULTI_LANG: 'ch',
+              se,
+            },
+            headers: {
+              Authorization: fa.auth,
+            },
+          })).data);
+
+        if (!pageNow && !pageTotal) {
+          pageNow = +$('input[name="cp1"]').val();
+          pageTotal = +$('tr.list_tool_text_attr > td').first().text().split('/')[1];
+        }
+
+        $('body > center > form > table.FixedTable tr.Col').each((idx, row) => {
+          const col = $(row).find('td');
+
+          _anFlows.push({
+            ip: col.eq(2).attr('onmouseover')!.replace(/[)\s';]/gi, '').split(/[(,]/)[1].substr(12),
+            mac: col.eq(3).text(),
+            name: col.eq(2).text(),
+            date: moment(col.eq(4).text(), 'MM/DD HH:mm:ss').add(8, 'hours').toDate(),
+          });
+        });
+
+        return _anFlows;
+      };
+
+    anFlows.push(...await processHtml(1));
+
+    const pages = Array.from(Array(pageTotal - pageNow), (_, i) => i + 1);
+    anFlows.push(...(await Promise.all(pages.map((i) => processHtml(i * pageCount + 1)))).flat(2));
+
+    return anFlows;
+  } catch (e) {
+    console.error(e);
+  }
+
+  return null;
+};
+
+export const delAllAnFlow = async (fa: FloorAuth): Promise<boolean> => {
+  try {
+    await axios.post(`${floor[fa.flr]}/anflowlist.cgi`, null, {
+      params: {
+        empty: '1',
+        q: '0',
+        menu: 'click_v=125\nclick_v=127',
+        MULTI_LANG: 'ch',
+      },
+      headers: {
+        Authorization: fa.auth,
+      },
+    });
+    return true;
+  } catch (e) {
+    console.error(e);
+  }
+
+  return false;
 };
