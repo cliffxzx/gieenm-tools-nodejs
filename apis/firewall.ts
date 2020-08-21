@@ -1,6 +1,6 @@
 import axios from 'axios';
 import cheerio from 'cheerio';
-import moment, { locale } from 'moment';
+import moment from 'moment';
 import 'moment-timezone';
 
 import { URLSearchParams } from 'url';
