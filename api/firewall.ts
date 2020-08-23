@@ -8,20 +8,6 @@ import configs from '../configs';
 
 const pageCount = Number.parseInt(configs.firewall.pageCount!, 10) || 10;
 
-export enum floor {
-  '1f' = 'http://140.115.151.224:8080/cgi-bin',
-  '2f' = 'http://140.115.151.230:8080/cgi-bin',
-  '3f' = 'http://140.115.151.228:8080/cgi-bin',
-  '4f' = 'http://140.115.151.223:8080/cgi-bin',
-  '205r' = 'http://140.115.150.146:8080/cgi-bin',
-  'wifi' = 'http://140.115.151.237:8080/cgi-bin',
-}
-
-export interface FloorAuth {
-  flr: keyof typeof floor,
-  auth: string,
-}
-
 export interface ID {
   n: string,
   time: string,
@@ -54,7 +40,7 @@ export interface AnFlow {
   date: Date,
 }
 
-export const getAllAddress = async (fa: FloorAuth): Promise<Address[]> => {
+export const getAllAddress = async (url: string, auth: string): Promise<Address[]> => {
   try {
     let
       pageNow = 0,
@@ -65,20 +51,23 @@ export const getAllAddress = async (fa: FloorAuth): Promise<Address[]> => {
       processHtml = async (se: number) => {
         const
           _IPs: Address[] = [],
-          $ = cheerio.load((await axios.get(`${floor[fa.flr]}/address.cgi`, {
+          $ = cheerio.load((await axios.get(`${url}/address.cgi`, {
             params: {
               menu: 'click_v=23\nclick_v=24\nclick_v=25\n',
               MULTI_LANG: 'ch',
               se,
             },
             headers: {
-              Authorization: fa.auth,
+              Authorization: auth,
             },
           })).data);
 
         if (!pageNow && !pageTotal) {
-          pageNow = +$('input[name="cp1"]').val();
-          pageTotal = +$('tr.list_tool_text_attr > td').first().text().split('/')[1];
+          const _pn = $('input[name="cp1"]'),
+            _pt = $('tr.list_tool_text_attr > td');
+
+          pageNow = _pn.length ? +_pn.val() : 0;
+          pageTotal = _pt.length ? +_pt.first().text().split('/')[1] : 0;
         }
 
         $('body > center > form > table.FixedTable tr.Col').each((idx, row) => {
@@ -116,10 +105,11 @@ export const getAllAddress = async (fa: FloorAuth): Promise<Address[]> => {
   return [];
 };
 
-export const addAddress = async (fa: FloorAuth, address: Address): Promise<Address | null> => {
+export const addAddress = async (url: string, auth: string, address: Address)
+  : Promise<Address | null> => {
   try {
     const
-      $ = cheerio.load((await axios.post(`${floor[fa.flr]}/address.cgi`, null, {
+      $ = cheerio.load((await axios.post(`${url}/address.cgi`, null, {
         params: {
           q: '1',
           s: '1',
@@ -128,7 +118,7 @@ export const addAddress = async (fa: FloorAuth, address: Address): Promise<Addre
           ipv: '0',
           adstartip4: '0.0.0.0',
           interface: 'All',
-          n: (await getAllAddress(fa)).length,
+          n: (await getAllAddress(url, auth)).length,
           id: (new Date().toISOString()).split(/[-T:.]/).slice(0, 6)
             .join(''),
           name: address.name,
@@ -140,7 +130,7 @@ export const addAddress = async (fa: FloorAuth, address: Address): Promise<Addre
           admac: address.mac,
         },
         headers: {
-          Authorization: fa.auth,
+          Authorization: auth,
         },
       })).data);
 
@@ -178,9 +168,9 @@ export const addAddress = async (fa: FloorAuth, address: Address): Promise<Addre
   return null;
 };
 
-export const delAddress = async (fa: FloorAuth, { n, time }: ID): Promise<boolean> => {
+export const delAddress = async (url: string, auth: string, { n, time }: ID): Promise<boolean> => {
   try {
-    await axios.post(`${floor[fa.flr]}/address.cgi`, null, {
+    await axios.post(`${url}/address.cgi`, null, {
       params: {
         q: '3',
         s: '3',
@@ -190,7 +180,7 @@ export const delAddress = async (fa: FloorAuth, { n, time }: ID): Promise<boolea
         n,
       },
       headers: {
-        Authorization: fa.auth,
+        Authorization: auth,
       },
     });
 
@@ -201,10 +191,11 @@ export const delAddress = async (fa: FloorAuth, { n, time }: ID): Promise<boolea
   }
 };
 
-export const getAddressGroup = async (fa: FloorAuth, id: ID): Promise<AddressGroup | null> => {
+export const getAddressGroup = async (url: string, auth: string, id: ID)
+  : Promise<AddressGroup | null> => {
   try {
     const
-      $ = cheerio.load((await axios.post(`${floor[fa.flr]}/address.cgi`, null, {
+      $ = cheerio.load((await axios.post(`${url}/address.cgi`, null, {
         params: {
           q: '2',
           t: '1',
@@ -214,7 +205,7 @@ export const getAddressGroup = async (fa: FloorAuth, id: ID): Promise<AddressGro
           id: id.time,
         },
         headers: {
-          Authorization: fa.auth,
+          Authorization: auth,
         },
       })).data);
 
@@ -252,7 +243,8 @@ export const getAddressGroup = async (fa: FloorAuth, id: ID): Promise<AddressGro
   return null;
 };
 
-export const getAllAddressGroup = async (fa: FloorAuth): Promise<AddressGroup[] | null> => {
+export const getAllAddressGroup = async (url: string, auth: string)
+  : Promise<AddressGroup[] | null> => {
   try {
     let
       pageNow = 0,
@@ -263,7 +255,7 @@ export const getAllAddressGroup = async (fa: FloorAuth): Promise<AddressGroup[] 
       processHtml = async (se: number) => {
         const
           _groups: AddressGroup[] = [],
-          $ = cheerio.load((await axios.get(`${floor[fa.flr]}/address.cgi`, {
+          $ = cheerio.load((await axios.get(`${url}/address.cgi`, {
             params: {
               t: 1,
               menu: 'click_v=23\nclick_v=24\nclick_v=26\n',
@@ -271,24 +263,29 @@ export const getAllAddressGroup = async (fa: FloorAuth): Promise<AddressGroup[] 
               se,
             },
             headers: {
-              Authorization: fa.auth,
+              Authorization: auth,
             },
           })).data);
 
         if (!pageNow && !pageTotal) {
-          pageNow = +$('input[name="cp1"]').val();
-          pageTotal = +$('tr.list_tool_text_attr > td').first().text().split('/')[1];
+          const _pn = $('input[name="cp1"]'),
+            _pt = $('tr.list_tool_text_attr > td');
+
+          pageNow = _pn.length ? +_pn.val() : 0;
+          pageTotal = _pt.length ? +_pt.first().text().split('/')[1] : 0;
         }
 
         await Promise.all(Array.from($('body > center > form > table.FixedTable tr.Col'))
           .map(async (row) => {
             const col = $(row);
-            const sid = col.find('button[type=submit]').attr('onclick')?.replace(/[)\s';]/gi, '')?.split(/[(,]/) as string[];
-            const id: ID = { n: sid[3], time: sid[2] };
+            if (!col.text().match(/^\s*沒有記錄！\s*$/gi)) {
+              const sid = col.find('button[type=submit]').attr('onclick')?.replace(/[)\s';]/gi, '')?.split(/[(,]/) as string[];
+              const id: ID = { n: sid[3], time: sid[2] };
 
-            const group = await getAddressGroup(fa, id);
+              const group = await getAddressGroup(url, auth, id);
 
-            _groups.push(group!);
+              _groups.push(group!);
+            }
           }));
 
         return _groups;
@@ -307,10 +304,10 @@ export const getAllAddressGroup = async (fa: FloorAuth): Promise<AddressGroup[] 
   return null;
 };
 
-export const updateAddressGroup = async (fa: FloorAuth, addressGroup: AddressGroup)
+export const updateAddressGroup = async (url: string, auth: string, addressGroup: AddressGroup)
   : Promise<AddressGroup | null> => {
   try {
-    await axios.post(`${floor[fa.flr]}/address.cgi`, null, {
+    await axios.post(`${url}/address.cgi`, null, {
       params: new URLSearchParams([
         ['q', '2'],
         ['t', '1'],
@@ -323,11 +320,11 @@ export const updateAddressGroup = async (fa: FloorAuth, addressGroup: AddressGro
         ...addressGroup.inGroup.map((address) => ['select_members', address.id.time] as [string, string]),
       ]),
       headers: {
-        Authorization: fa.auth,
+        Authorization: auth,
       },
     });
 
-    return await getAddressGroup(fa, addressGroup.id);
+    return await getAddressGroup(url, auth, addressGroup.id);
   } catch (e) {
     console.log(e);
   }
@@ -335,7 +332,7 @@ export const updateAddressGroup = async (fa: FloorAuth, addressGroup: AddressGro
   return null;
 };
 
-export const getAllAnFlow = async (fa: FloorAuth): Promise<AnFlow[] | null> => {
+export const getAllAnFlow = async (url: string, auth: string): Promise<AnFlow[] | null> => {
   try {
     let
       pageNow = 0,
@@ -346,20 +343,23 @@ export const getAllAnFlow = async (fa: FloorAuth): Promise<AnFlow[] | null> => {
       processHtml = async (se: number) => {
         const
           _anFlows: AnFlow[] = [],
-          $ = cheerio.load((await axios.get(`${floor[fa.flr]}/anflowlist.cgi`, {
+          $ = cheerio.load((await axios.get(`${url}/anflowlist.cgi`, {
             params: {
               menu: 'click_v=125\nclick_v=127',
               MULTI_LANG: 'ch',
               se,
             },
             headers: {
-              Authorization: fa.auth,
+              Authorization: auth,
             },
           })).data);
 
         if (!pageNow && !pageTotal) {
-          pageNow = +$('input[name="cp1"]').val();
-          pageTotal = +$('tr.list_tool_text_attr > td').first().text().split('/')[1];
+          const _pn = $('input[name="cp1"]'),
+            _pt = $('tr.list_tool_text_attr > td');
+
+          pageNow = _pn.length ? +_pn.val() : 0;
+          pageTotal = _pt.length ? +_pt.first().text().split('/')[1] : 0;
         }
 
         $('body > center > form > table.FixedTable tr.Col').each((idx, row) => {
@@ -389,9 +389,9 @@ export const getAllAnFlow = async (fa: FloorAuth): Promise<AnFlow[] | null> => {
   return null;
 };
 
-export const delAllAnFlow = async (fa: FloorAuth): Promise<boolean> => {
+export const delAllAnFlow = async (url: string, auth: string): Promise<boolean> => {
   try {
-    await axios.post(`${floor[fa.flr]}/anflowlist.cgi`, null, {
+    await axios.post(`${url}/anflowlist.cgi`, null, {
       params: {
         empty: '1',
         q: '0',
@@ -399,7 +399,7 @@ export const delAllAnFlow = async (fa: FloorAuth): Promise<boolean> => {
         MULTI_LANG: 'ch',
       },
       headers: {
-        Authorization: fa.auth,
+        Authorization: auth,
       },
     });
     return true;

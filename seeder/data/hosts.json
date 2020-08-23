@@ -1,0 +1,7 @@
+[
+  {
+    "name": "test",
+    "url": "http://test.com/cgi-bin",
+    "auth": "Basic testtesttesttest"
+  }
+]

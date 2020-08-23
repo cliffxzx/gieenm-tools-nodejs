@@ -3,7 +3,7 @@
 
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/facebook/react/blob/master/LICENSE)
 
-GIEE Network Manager Tools Node.js is an Tools for GIEE, Its goal is to manage firewall and so on.
+GIEE Network Manager Tools Node.js is a Tools for GIEE, Its goal is to manage firewall and so on.
 
 ## Installation
 
@@ -31,6 +31,18 @@ FIREWALL_PAGE_COUNT=200
 
 SERVER_PORT=80
 SERVER_SALT=
+```
+
+### Set Database Default Data
+```json
+// seeder/data/hosts.json
+[
+  {
+    "name": "${name}",
+    "url": "${url}",
+    "auth": "${auth}" // Like "Basic xxxx"
+  }
+]
 ```
 
 ### Start

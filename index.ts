@@ -3,22 +3,20 @@ import bodyparser from 'koa-bodyparser';
 import logger from 'koa-logger';
 import { createConnection } from 'typeorm';
 
-import router from './routes';
+import router from './route';
 import configs from './configs';
+import { firewall } from './model/firewall';
 
 const main = async () => {
-  await createConnection({
-    type: 'mysql',
-    host: configs.database.host,
-    port: configs.database.port,
-    username: configs.database.username,
-    password: configs.database.password,
-    database: configs.database.database,
-    synchronize: true,
-    logging: false,
-    entities: ['entity/**/*.ts'],
-    migrations: ['migration/**/*.ts'],
-  });
+  await createConnection();
+
+  if (configs.env === 'development') {
+    const { Hosts1598113593926 } = await import('./seeder/1598113593926-Hosts');
+    const connection = await createConnection('seeder');
+    await new Hosts1598113593926().down(connection.createQueryRunner());
+    await new Hosts1598113593926().up(connection.createQueryRunner());
+    await firewall.syncFirewallToDataBase();
+  }
 
   const app = new Koa();
 

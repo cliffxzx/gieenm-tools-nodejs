@@ -36,6 +36,12 @@
       {
         "props": false
       }
+    ],
+    "max-classes-per-file": [
+      "off"
+    ],
+    "class-methods-use-this": [
+      "off"
     ]
   },
   "settings": {
