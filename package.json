@@ -6,7 +6,8 @@
    "scripts": {
       "test": "echo \"Error: no test specified\" && exit 1",
       "start": "ts-node index.ts",
-      "dev": "nodemon",
+      "dev": "ts-node-dev --respawn --transpile-only --ignore-watch \"node_modules .git\" -- index.ts",
+      "dev:detail": "ts-node-dev --respawn --transpile-only --debug --ignore-watch \"node_modules .git\" -- index.ts",
       "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/.bin/typeorm",
       "seeder:create": "npm run typeorm -- migration:create --config ormconfig.ts -c seeder -n ",
       "seeder:generate": "npm run typeorm -- migration:generate --config ormconfig.ts -c seeder -n ",
@@ -31,8 +32,8 @@
       "eslint-config-airbnb": "^18.2.0",
       "eslint-config-airbnb-base": "^14.2.0",
       "eslint-plugin-import": "^2.22.0",
-      "nodemon": "^2.0.4",
       "ts-node": "^8.10.2",
+      "ts-node-dev": "^1.0.0-pre.60",
       "typescript": "^3.9.7"
    },
    "dependencies": {
