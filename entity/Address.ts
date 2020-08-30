@@ -4,18 +4,18 @@ import {
   BaseEntity,
   PrimaryGeneratedColumn,
   Column,
-  OneToOne,
   CreateDateColumn,
   UpdateDateColumn,
   DeleteDateColumn,
   JoinColumn,
+  ManyToOne,
 } from 'typeorm';
 import { User } from './User';
 import { AddressGroup } from './AddressGroup';
+import { Host } from './Host';
 
 @Entity()
-@Unique('uid', ['uidN', 'uidTime'])
-@Unique('address', ['ip', 'subnet', 'mac', 'user', 'group'])
+@Unique('address', ['uidN', 'uidTime', 'user', 'group'])
 export class Address extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
@@ -36,12 +36,16 @@ export class Address extends BaseEntity {
   mac: string;
 
   @JoinColumn()
-  @OneToOne((type) => AddressGroup, (group) => group.name)
+  @ManyToOne((type) => AddressGroup, (group) => group.name, { onDelete: 'CASCADE' })
   group: AddressGroup;
 
   @JoinColumn()
-  @OneToOne((type) => User, (user) => user.name)
+  @ManyToOne((type) => User, (user) => user.name, { onDelete: 'CASCADE', nullable: false })
   user: User;
+
+  @JoinColumn()
+  @ManyToOne((type) => Host, (host) => host.name, { onDelete: 'CASCADE' })
+  host: Host;
 
   @CreateDateColumn()
   createDate: string;

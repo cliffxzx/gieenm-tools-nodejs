@@ -9,13 +9,16 @@ export enum UserRole {
 }
 
 @Entity()
-@Unique(['name'])
+@Unique('name', ['name'])
 export class User {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Column()
   name: string;
+
+  @Column()
+  fwName: string;
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.user })
   role: UserRole;

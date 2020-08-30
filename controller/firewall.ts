@@ -7,12 +7,11 @@ import * as api from '../api/firewall';
 import { Host } from '../entity/Host';
 
 export default {
-  async hostAuth(ctx: ParameterizedContext, next: () => Promise<void>): Promise<void> {
-    const { name }: { name: string } = ctx.params;
-    const { authorization: auth }: { authorization: string } = ctx.request.header;
+  async firewallHost(ctx: ParameterizedContext, next: () => Promise<void>): Promise<void> {
+    const { host: name }: { host: string } = ctx.params;
     try {
-      const host = getRepository(Host).findOneOrFail({ name });
-      ctx.hostAuth = { host, auth };
+      const host = (await getRepository(Host).findOneOrFail({ name })).get();
+      ctx.firewall = { host };
     } catch (e) {
       console.error(e);
       ctx.status = 400;
@@ -24,19 +23,19 @@ export default {
     await next();
   },
   async getAllAddress(ctx: ParameterizedContext): Promise<void> {
-    const { host, auth } = ctx.hostAuth;
-    const IPs = await api.getAllAddress(host, auth);
+    const { url, auth } = ctx.firewall.host as Host;
+    const IPs = await api.getAllAddress(url, auth);
     ctx.body = IPs;
   },
   async addAddress(ctx: ParameterizedContext): Promise<void> {
-    const { host, auth } = ctx.hostAuth;
-    const res = await api.addAddress(host, auth, ctx.request.body);
+    const { url, auth } = ctx.firewall.host as Host;
+    const res = await api.addAddress(url, auth, ctx.request.body);
     ctx.status = (res ? 200 : 400);
     ctx.body = res;
   },
   async delAddress(ctx: ParameterizedContext): Promise<void> {
-    const { host, auth } = ctx.hostAuth;
-    const res = await api.delAddress(host, auth, ctx.request.body);
+    const { url, auth } = ctx.firewall.host as Host;
+    const res = await api.delAddress(url, auth, ctx.request.body);
     ctx.status = (res ? 200 : 400);
   },
   async getAddressGroup(ctx: ParameterizedContext, next: () => Promise<void>): Promise<void> {
@@ -49,14 +48,14 @@ export default {
         time: sid[0],
       };
 
-      const { host, auth } = ctx.hostAuth;
-      const group = await api.getAddressGroup(host, auth, id);
+      const { url, auth } = ctx.firewall.host as Host;
+      const group = await api.getAddressGroup(url, auth, id);
       ctx.body = group;
     }
   },
   async getAllAddressGroup(ctx: ParameterizedContext): Promise<void> {
-    const { host, auth } = ctx.hostAuth;
-    const groups = await api.getAllAddressGroup(host, auth);
+    const { url, auth } = ctx.firewall.host as Host;
+    const groups = await api.getAllAddressGroup(url, auth);
     ctx.body = groups;
   },
   async updateAddressGroup(ctx: ParameterizedContext): Promise<void> {
@@ -70,21 +69,21 @@ export default {
 
     inGroup = inGroup.map((time: string) => ({ id: { time } }));
 
-    const { host, auth } = ctx.hostAuth;
-    const res = await api.updateAddressGroup(host, auth, { id, name, inGroup });
+    const { url, auth } = ctx.firewall.host as Host;
+    const res = await api.updateAddressGroup(url, auth, { id, name, inGroup });
 
     ctx.status = (res ? 200 : 400);
     ctx.body = res;
   },
   async getAllAnFlow(ctx: ParameterizedContext): Promise<void> {
-    const { host, auth } = ctx.hostAuth;
-    const anFlows = await api.getAllAnFlow(host, auth);
+    const { url, auth } = ctx.firewall.host as Host;
+    const anFlows = await api.getAllAnFlow(url, auth);
     ctx.status = isNull(anFlows) ? 400 : 200;
     ctx.body = anFlows;
   },
   async delAllAnFlow(ctx: ParameterizedContext): Promise<void> {
-    const { host, auth } = ctx.hostAuth;
-    const res = await api.delAllAnFlow(host, auth);
+    const { url, auth } = ctx.firewall.host as Host;
+    const res = await api.delAllAnFlow(url, auth);
     ctx.status = res ? 200 : 400;
   },
 };

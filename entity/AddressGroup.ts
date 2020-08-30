@@ -1,11 +1,10 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, Unique, BaseEntity, OneToOne, JoinColumn,
+  Entity, PrimaryGeneratedColumn, Column, Unique, BaseEntity, ManyToOne, JoinColumn,
 } from 'typeorm';
 import { Host } from './Host';
 
 @Entity()
-@Unique('uid', ['uidN', 'uidTime'])
-@Unique('group', ['name', 'host'])
+@Unique('group', ['uidN', 'uidTime', 'name', 'host'])
 export class AddressGroup extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number;
@@ -20,6 +19,6 @@ export class AddressGroup extends BaseEntity {
   name: string;
 
   @JoinColumn()
-  @OneToOne((type) => Host, (host) => host.name)
+  @ManyToOne((type) => Host, (host) => host.name, { onDelete: 'CASCADE' })
   host: Host;
 }

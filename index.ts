@@ -15,7 +15,7 @@ const main = async () => {
     const connection = await createConnection('seeder');
     await new Hosts1598113593926().down(connection.createQueryRunner());
     await new Hosts1598113593926().up(connection.createQueryRunner());
-    await firewall.syncFirewallToDataBase();
+    await firewall.syncFirewallToDatabase();
   }
 
   const app = new Koa();

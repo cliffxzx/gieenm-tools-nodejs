@@ -1,10 +1,11 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, EntityRepository, Repository, Unique, BaseEntity,
+  Entity, PrimaryGeneratedColumn, Column, EntityRepository, Repository, Unique, BaseEntity, OneToMany,
 } from 'typeorm';
 
 import CryptoJS from 'crypto-js';
 
 import configs from '../configs';
+import { Address } from './Address';
 
 @Entity()
 @Unique(['name'])

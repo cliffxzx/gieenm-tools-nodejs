@@ -12,7 +12,11 @@
       "seeder:create": "npm run typeorm -- migration:create --config ormconfig.ts -c seeder -n ",
       "seeder:generate": "npm run typeorm -- migration:generate --config ormconfig.ts -c seeder -n ",
       "seeder:run": "npm run typeorm -- migration:run --config ormconfig.ts -c seeder",
-      "seeder:revert": "npm run typeorm -- migration:revert --config ormconfig.ts -c seeder"
+      "seeder:revert": "npm run typeorm -- migration:revert --config ormconfig.ts -c seeder",
+      "migrate:create": "npm run typeorm -- migration:create --config ormconfig.ts -n ",
+      "migrate:generate": "npm run typeorm -- migration:generate --config ormconfig.ts -n ",
+      "migrate:run": "npm run typeorm -- migration:run --config ormconfig.ts",
+      "migrate:revert": "npm run typeorm -- migration:revert --config ormconfig.ts"
    },
    "author": "",
    "license": "MIT",
